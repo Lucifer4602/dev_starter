@@ -1,0 +1,95 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: download source code
+      uses: actions/checkout@v2
+
+    - name: set environment variables in .env file
+      run: |
+          echo DAJNGO_SECRET_KEY="${{ secrets.DAJNGO_SECRET_KEY }}" >> .env
+          echo BASE_URL="${{ secrets.BASE_URL }}" >> .env
+          echo DJANGO_DEBUG="${{ secrets.DJANGO_DEBUG }}" >> .env
+          echo POSTGRESS_DB_NAME="${{ secrets.POSTGRESS_DB_NAME }}" >> .env
+          echo POSTGRESS_USER="${{ secrets.POSTGRESS_USER }}" >> .env
+          echo POSTGRESS_PASSWORD="${{ secrets.POSTGRESS_PASSWORD }}" >> .env
+          echo POSTGRESS_HOST="${{ secrets.POSTGRESS_HOST }}" >> .env
+          echo STRIPE_SECRET_KEY="${{ secrets.STRIPE_SECRET_KEY }}" >> .env
+          echo STRIPE_WEBHOOK_SECRET_LIVE="${{ secrets.STRIPE_WEBHOOK_SECRET_LIVE }}" >> .env
+          echo STRIPE_PUBLISHABLE_KEY="${{ secrets.STRIPE_PUBLISHABLE_KEY }}" >> .env
+          echo FRONTEND_SITE_URL="${{ secrets.FRONTEND_SITE_URL }}" >> .env
+          echo PAYMENT_SUCCESS_URL="${{ secrets.PAYMENT_SUCCESS_URL }}" >> .env
+          echo PAYMENT_FAILURE_URL="${{ secrets.PAYMENT_FAILURE_URL }}" >> .env
+          echo JWT_AUTH_SECRET="${{ secrets.JWT_AUTH_SECRET }}" >> .env
+          echo JWT_AUTH_ALGORITHM="${{ secrets.JWT_AUTH_ALGORITHM }}" >> .env
+          echo DJANGO_SETTINGS_MODULE="${{ secrets.DJANGO_SETTINGS_MODULE }}" >> .env
+          echo GOOGLE_OAUTH2_CLIENT_ID="${{ secrets.GOOGLE_OAUTH2_CLIENT_ID }}" >> .env
+          echo GOOGLE_OAUTH2_CLIENT_SECRET="${{ secrets.GOOGLE_OAUTH2_CLIENT_SECRET }}" >> .env
+          echo GOOGLE_REDIRECT_URI="${{ secrets.GOOGLE_REDIRECT_URI }}" >> .env
+          echo DEFAULT_USER_AVATAR="${{ secrets.DEFAULT_USER_AVATAR }}" >> .env
+          echo VERIFY_EMAIL_ON_SIGNUP="${{ secrets.VERIFY_EMAIL_ON_SIGNUP }}" >> .env
+          echo EMAIL_BACKEND="${{ secrets.EMAIL_BACKEND }}" >> .env
+          echo EMAIL_HOST="${{ secrets.EMAIL_HOST }}" >> .env
+          echo EMAIL_HOST_USER="${{ secrets.EMAIL_HOST_USER }}" >> .env
+          echo EMAIL_HOST_PASSWORD="${{ secrets.EMAIL_HOST_PASSWORD }}" >> .env
+          echo SENTRY_DSN="${{ secrets.SENTRY_DSN }}" >> .env
+          echo COMPANY_NAME="${{ secrets.COMPANY_NAME }}" >> .env
+          echo EMAIL_VERIFICATION_REDIRECT_URI="${{ secrets.EMAIL_VERIFICATION_REDIRECT_URI }}" >> .env
+          echo AUTH_TOKEN_EXPIRY_DAYS="${{ secrets.AUTH_TOKEN_EXPIRY_DAYS }}" >> .env
+          echo ADMIN_EMAIL="${{ secrets.ADMIN_EMAIL }}" >> .env
+          echo BEEHIV_API_KEY="${{ secrets.BEEHIV_API_KEY }}" >> .env
+          echo BEEHIV_PUBLICATION_ID="${{ secrets.BEEHIV_PUBLICATION_ID }}" >> .env
+          echo RECAPTCHA_SECRET_KEY="${{ secrets.RECAPTCHA_SECRET_KEY }}" >> .env
+          echo BREVO_API_KEY="${{ secrets.BREVO_API_KEY }}" >> .env
+          echo USE_S3="${{ secrets.USE_S3 }}" >> .env
+          echo MEDIA_ROOT="${{ secrets.MEDIA_ROOT }}" >> .env
+          echo AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}" >> .env
+          echo AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> .env
+          echo AWS_REGION_NAME="${{ secrets.AWS_REGION_NAME }}" >> .env
+          echo AWS_BUCKET_NAME="${{ secrets.AWS_BUCKET_NAME }}" >> .env
+          echo _GITHUB_ACCESS_TOKEN="${{ secrets._GITHUB_ACCESS_TOKEN }}" >> .env
+          echo _GITHUB_OWNER="${{ secrets._GITHUB_OWNER }}" >> .env
+          echo _GITHUB_FRONTEND_REPO_NAME="${{ secrets._GITHUB_FRONTEND_REPO_NAME }}" >> .env
+          echo _GITHUB_BACKEND_REPO_NAME="${{ secrets._GITHUB_BACKEND_REPO_NAME }}" >> .env
+
+
+
+    - name: Build the Docker image
+      run:  |
+        ls
+        docker build -t the_dev_starter_api .
+    -
+      name: Generate Deployment Package
+      run: zip -r deploy.zip * .env*
+    -
+      name: Get timestamp
+      uses: gerred/actions/current-time@master
+      id: current-time
+
+    - name: Run string replace
+      uses: frabert/replace-string-action@master
+      id: format-time
+      with:
+        pattern: '[:\.]+'
+        string: "${{ steps.current-time.outputs.time }}"
+        replace-with: '-'
+        flags: 'g'
+
+
+    - name: Deploy to EB
+      uses: einaregilsson/beanstalk-deploy@v14
+      with:
+        aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        application_name: the-dev-starter-prod
+        environment_name: The-dev-starter-prod-env
+        version_label: "Thedevstarter-${{ steps.format-time.outputs.replaced }}"
+        region: us-east-1
+        deployment_package: deploy.zip
